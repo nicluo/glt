@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/speedata/gogit"
+
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -24,7 +25,7 @@ func isEqual(c1, c2 *gogit.Commit) bool {
 		c1.Committer.When == c2.Committer.When)
 }
 
-func LogCommit(ci *gogit.Commit) {
+func logCommit(ci *gogit.Commit) {
 	log.Printf("commit %s\n", ci.Oid)
 	log.Printf("Author        : %s <%s>\n", ci.Author.Name, ci.Author.Email)
 	log.Printf("Date          : %s\n", ci.Author.When)
@@ -81,13 +82,13 @@ func (r *Repo) SaveCommitIfModified(commit *gogit.Commit) (string, error) {
 	}
 
 	if !isEqual(commit, original) {
-		return r.OverwriteCommit(commit)
+		return r.SaveCommit(commit)
 	}
 
 	return "", nil
 }
 
-func (r *Repo) OverwriteCommit(commit *gogit.Commit) (string, error) {
+func (r *Repo) SaveCommit(commit *gogit.Commit) (string, error) {
 	gitCmd := fmt.Sprintf(`git filter-branch --env-filter 'if [ $GIT_COMMIT = %s ]
 	  then
 	  	export GIT_AUTHOR_NAME="%s" &&
