@@ -57,11 +57,10 @@ func main() {
 		logCommit(commit)
 
 		commit = editCommit(stdscr, commit)
-
-		log.Println("After Edit")
-		logCommit(commit)
-
 		if commit != nil {
+			log.Println("After Edit")
+			logCommit(commit)
+
 			refChange, err := repo.SaveCommitIfModified(commit)
 			if err != nil {
 				log.Fatalf("Error saving commit: %s", err)
