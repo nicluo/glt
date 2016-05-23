@@ -82,7 +82,6 @@ func (r *Repo) GetLog(n int) ([]*gogit.Commit, error) {
 		}
 		commitList[i] = ci
 	}
-	log.Println(commitList)
 
 	return commitList, nil
 }
