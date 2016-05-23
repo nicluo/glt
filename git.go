@@ -105,6 +105,7 @@ func (r *Repo) SaveCommit(commit *gogit.Commit) (string, error) {
 		commit.Committer.Name,
 		commit.Committer.Email,
 		commit.Committer.When.String())
+	log.Println(gitCmd)
 	cmd := exec.Command("bash", "-c", gitCmd)
 
 	output, err := cmd.Output()

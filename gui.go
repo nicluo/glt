@@ -101,13 +101,9 @@ func editCommit(stdscr *gc.Window, commit *gogit.Commit) *gogit.Commit {
 	for ch != 27 {
 		switch ch {
 		case gc.KEY_ENTER, gc.KEY_RETURN:
-			log.Println(fields[2].Buffer())
 			const sample = "2006-01-02 15:04:05 -0700 MST"
 			authorTime, _ := time.Parse(sample, strings.TrimSpace(fields[2].Buffer()))
 			committerTime, _ := time.Parse(sample, strings.TrimSpace(fields[5].Buffer()))
-
-			log.Println(authorTime)
-			log.Println(committerTime)
 
 			commit.Author.Name = strings.TrimSpace(fields[0].Buffer())
 			commit.Author.Email = strings.TrimSpace(fields[1].Buffer())
