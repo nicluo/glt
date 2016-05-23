@@ -19,6 +19,11 @@ func main() {
 			log.Fatalf("error opening repository: %v", err)
 		}
 
+		dirty := repo.IsDirty()
+		if dirty == true {
+			log.Fatal("git directory has uncommited changes, please stash and try agian.")
+		}
+
 		commits, err := repo.GetLog(10)
 		if err != nil {
 			log.Fatalf("error getting commit log: %v", err)

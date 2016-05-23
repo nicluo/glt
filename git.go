@@ -33,6 +33,17 @@ func logCommit(ci *gogit.Commit) {
 	log.Printf("Committer Date: %s\n", ci.Committer.When)
 }
 
+func getCommitChainLength(ci *gogit.Commit, n int) int {
+	for i := 1; i < n; i++ {
+		ci = ci.Parent(0)
+		if ci.ParentCount() == 0 {
+			return i + 1
+		}
+	}
+
+	return n
+}
+
 func OpenCurrentRepository() (*Repo, error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -59,19 +70,30 @@ func (r *Repo) GetLog(n int) ([]*gogit.Commit, error) {
 		return nil, err
 	}
 
-	if n > ci.ParentCount()+1 {
-		n = ci.ParentCount() + 1
-	}
+	n = getCommitChainLength(ci, n)
 
 	commitList := make([]*gogit.Commit, n)
 	commitList[0] = ci
 
 	for i := 1; i < n; i++ {
 		ci = ci.Parent(0)
+		if ci == nil {
+			break
+		}
 		commitList[i] = ci
 	}
+	log.Println(commitList)
 
 	return commitList, nil
+}
+
+func (r *Repo) IsDirty() bool {
+	gitCmd := `[[ $(git diff --shortstat 2> /dev/null | tail -n1) != "" ]] && echo "dirty"`
+	cmd := exec.Command("bash", "-c", gitCmd)
+	output, _ := cmd.Output()
+
+	re := regexp.MustCompile("dirty")
+	return re.Match(output)
 }
 
 // Returns the ref of change and error
