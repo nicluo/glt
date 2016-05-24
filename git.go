@@ -110,6 +110,11 @@ func (r *Repo) SaveCommitIfModified(commit *gogit.Commit) (string, error) {
 }
 
 func (r *Repo) SaveCommit(commit *gogit.Commit) (string, error) {
+	scope := ""
+	if commit.Parent(0) != nil {
+		scope = fmt.Sprintf("%s..HEAD", commit.Parent(0).Oid.String())
+	}
+
 	gitCmd := fmt.Sprintf(`git filter-branch --env-filter 'if [ $GIT_COMMIT = %s ]
 	  then
 	  	export GIT_AUTHOR_NAME="%s" &&
@@ -117,7 +122,7 @@ func (r *Repo) SaveCommit(commit *gogit.Commit) (string, error) {
 	  	export GIT_AUTHOR_DATE="%s" &&
 	  	export GIT_COMMITTER_NAME="%s" &&
 	  	export GIT_COMMITTER_EMAIL="%s" &&
-	  	export GIT_COMMITTER_DATE="%s"; fi' &&
+	  	export GIT_COMMITTER_DATE="%s"; fi' %s &&
 	  rm -fr "$(git rev-parse --git-dir)/refs/original/"`,
 		commit.Oid.String(),
 		commit.Author.Name,
@@ -125,7 +130,8 @@ func (r *Repo) SaveCommit(commit *gogit.Commit) (string, error) {
 		commit.Author.When.String(),
 		commit.Committer.Name,
 		commit.Committer.Email,
-		commit.Committer.When.String())
+		commit.Committer.When.String(),
+		scope)
 	log.Println(gitCmd)
 	cmd := exec.Command("bash", "-c", gitCmd)
 
