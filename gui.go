@@ -11,9 +11,18 @@ import (
 )
 
 func selectCommit(stdscr *gc.Window, commits []*gogit.Commit) *gogit.Commit {
+	my, mx := stdscr.MaxYX()
+
 	menu_items := make([]string, len(commits))
+	menu_desc := make([]string, len(commits))
+	message_length := mx - 41
 	for i, commit := range commits {
-		menu_items[i] = commit.Oid.String()
+		trimMessage := strings.Split(commit.CommitMessage, "\n")[0]
+		if len(trimMessage) > message_length {
+			trimMessage = trimMessage[:message_length-2] + ".."
+		}
+		menu_items[i] = " " + commit.Oid.String()[:16]
+		menu_desc[i] = commit.Committer.When.String()[5:19] + " - " + trimMessage
 	}
 
 	stdscr.Clear()
@@ -21,9 +30,20 @@ func selectCommit(stdscr *gc.Window, commits []*gogit.Commit) *gogit.Commit {
 
 	items := make([]*gc.MenuItem, len(menu_items))
 	for i, val := range menu_items {
-		items[i], _ = gc.NewItem(val, "")
+		var err error
+		items[i], err = gc.NewItem(val, menu_desc[i])
+		if err != nil {
+			panic(err)
+		}
 		defer items[i].Free()
 	}
+
+	win, err := gc.NewWindow(12, mx, 3, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	win.Keypad(true)
+	win.Box(0, 0)
 
 	menu, err := gc.NewMenu(items)
 	if err != nil {
@@ -31,14 +51,23 @@ func selectCommit(stdscr *gc.Window, commits []*gogit.Commit) *gogit.Commit {
 	}
 	defer menu.Free()
 
-	menu.Post()
+	menu.SetPad('-')
+	menu.SetSpacing(3, 1, 1)
 
-	stdscr.MovePrint(20, 0, "'esc' to exit")
+	dwin := win.Derived(10, mx-2, 1, 1)
+	menu.SubWindow(dwin)
+	menu.Post()
+	defer menu.UnPost()
+
+	title := "Welcome to GLT!"
+	stdscr.MovePrint(1, mx/2-len(title)/2, title)
+	stdscr.MovePrint(my-1, 1, "'esc' to exit")
 	stdscr.Refresh()
+	win.Refresh()
 
 	for {
 		gc.Update()
-		ch := stdscr.GetChar()
+		ch := win.GetChar()
 		if ch == 27 {
 			return nil
 		}
