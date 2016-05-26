@@ -88,9 +88,6 @@ func editCommit(stdscr *gc.Window, commit *gogit.Commit) *gogit.Commit {
 	stdscr.Clear()
 	stdscr.Keypad(true)
 
-	gc.InitPair(1, gc.C_WHITE, gc.C_BLUE)
-	gc.InitPair(2, gc.C_YELLOW, gc.C_BLUE)
-	gc.InitPair(3, gc.C_WHITE, gc.C_GREEN)
 
 	fields := make([]*gc.Field, 6)
 	for i := 0; i < 6; i++ {
