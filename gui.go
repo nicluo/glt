@@ -82,23 +82,30 @@ func selectCommit(stdscr *gc.Window, commits []*gogit.Commit) *gogit.Commit {
 
 func editCommit(stdscr *gc.Window, commit *gogit.Commit) *gogit.Commit {
 	stdscr.Clear()
+	_, mx := stdscr.MaxYX()
+	title := fmt.Sprintf("Edit Commit %s", commit.Oid.String())
+	stdscr.MovePrint(1, mx/2-len(title)/2, title)
+	stdscr.MovePrint(16, 1, "'enter' to save, 'esc' to exit")
 	stdscr.Keypad(true)
 
+	win, err := gc.NewWindow(12, mx, 3, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	dwin := win.Derived(10, mx-2, 1, 1)
+	win.Keypad(true)
+	win.ColorOn(1)
+	win.Box(0, 0)
+	win.ColorOff(1)
 
 	fields := make([]*gc.Field, 6)
 	for i := 0; i < 6; i++ {
-		fields[i], _ = gc.NewField(1, 30, int32(i), 17, 0, 0)
+		fields[i], _ = gc.NewField(1, 30, int32(i), 19, 0, 0)
 		defer fields[i].Free()
-		fields[i].SetForeground(gc.ColorPair(1))
-		fields[i].SetBackground(gc.ColorPair(2) | gc.A_UNDERLINE | gc.A_BOLD)
+		fields[i].SetForeground(gc.ColorPair(3))
+		fields[i].SetBackground(gc.ColorPair(3) | gc.A_UNDERLINE | gc.A_BOLD)
 		fields[i].SetOptionsOff(gc.FO_AUTOSKIP)
 	}
-
-	form, _ := gc.NewForm(fields)
-	form.Post()
-	defer form.UnPost()
-	defer form.Free()
-	stdscr.Refresh()
 
 	fields[0].SetBuffer(commit.Author.Name)
 	fields[1].SetBuffer(commit.Author.Email)
@@ -107,22 +114,38 @@ func editCommit(stdscr *gc.Window, commit *gogit.Commit) *gogit.Commit {
 	fields[4].SetBuffer(commit.Committer.Email)
 	fields[5].SetBuffer(commit.Committer.When.String())
 
-	stdscr.AttrOn(gc.ColorPair(2) | gc.A_BOLD)
-	stdscr.MovePrint(0, 0, "Author Name    :")
-	stdscr.MovePrint(1, 0, "Author Email   :")
-	stdscr.MovePrint(2, 0, "Author Date    :")
-	stdscr.MovePrint(3, 0, "Committer Name :")
-	stdscr.MovePrint(4, 0, "Committer Email:")
-	stdscr.MovePrint(5, 0, "Committer Date :")
-	stdscr.AttrOff(gc.ColorPair(2) | gc.A_BOLD)
+	form, _ := gc.NewForm(fields)
+	form.SetWindow(win)
+	form.SetSub(dwin)
+	form.Post()
+	defer form.UnPost()
+	defer form.Free()
+
+	dwin.MovePrint(0, 1, "Author Name    :")
+	dwin.MovePrint(1, 1, "Author Email   :")
+	dwin.MovePrint(2, 1, "Author Date    :")
+	dwin.MovePrint(3, 1, "Committer Name :")
+	dwin.MovePrint(4, 1, "Committer Email:")
+	dwin.MovePrint(5, 1, "Committer Date :")
+
+	messageLength := mx - 4
+	trimMessage := fmt.Sprintf("Message: %s", strings.Split(commit.CommitMessage, "\n")[0])
+	if len(trimMessage) > messageLength {
+		trimMessage = trimMessage[:messageLength-2] + ".."
+	}
+	dwin.MovePrint(7, 1, trimMessage)
+
 	stdscr.Refresh()
+	win.Refresh()
 
 	form.Driver(gc.REQ_FIRST_FIELD)
 
-	ch := stdscr.GetChar()
+	ch := win.GetChar()
 	for ch != 27 {
 		switch ch {
 		case gc.KEY_ENTER, gc.KEY_RETURN:
+			form.Driver(gc.REQ_VALIDATION)
+
 			const sample = "2006-01-02 15:04:05 -0700 MST"
 			authorTime, _ := time.Parse(sample, strings.TrimSpace(fields[2].Buffer()))
 			committerTime, _ := time.Parse(sample, strings.TrimSpace(fields[5].Buffer()))
@@ -150,6 +173,7 @@ func editCommit(stdscr *gc.Window, commit *gogit.Commit) *gogit.Commit {
 		default:
 			form.Driver(ch)
 		}
+		win.Refresh()
 		ch = stdscr.GetChar()
 	}
 
