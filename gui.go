@@ -181,16 +181,15 @@ func editCommit(stdscr *gc.Window, commit *gogit.Commit) *gogit.Commit {
 }
 
 func showResult(stdscr *gc.Window, result string) {
-	y, x := 5, 20
+	_, mx := stdscr.MaxYX()
 	h, w := 10, 40
+	y, x := 4, (mx-w)/2
 
-	var title string
+	title := "No Changes. Exiting."
+	exit := "Press any key to quit."
 	if result != "" {
 		title = fmt.Sprintf("Changed: %s.", result)
-	} else {
-		title = "No Changes. Exiting."
 	}
-	exit := "Press any key to quit."
 	window, _ := gc.NewWindow(h, w, y, x)
 	window.Box(0, 0)
 	window.MovePrint(1, (w/2)-(len(title)/2), title)
