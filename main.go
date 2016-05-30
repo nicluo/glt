@@ -4,6 +4,7 @@ import (
 	"github.com/codegangsta/cli"
 	gc "github.com/rthornton128/goncurses"
 
+	"io/ioutil"
 	"log"
 	"os"
 )
@@ -13,6 +14,12 @@ func main() {
 	app.Name = "glt"
 	app.Usage = "Git Local Transform"
 	app.Version = "1.0.0"
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "d, debug",
+			Usage: "Write debug log (glt.log)",
+		},
+	}
 	app.Action = func(c *cli.Context) {
 		repo, err := OpenCurrentRepository()
 		if err != nil {
@@ -29,13 +36,18 @@ func main() {
 			log.Fatalf("error getting commit log: %v", err)
 		}
 
-		// Initialize file logging just before curses
-		f, err := os.OpenFile("glt.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			log.Fatalf("error opening log file: %v", err)
+		if c.IsSet("debug") {
+			// Initialize file logging just before curses
+			f, err := os.OpenFile("glt.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				log.Fatalf("error opening log file: %v", err)
+			}
+			defer f.Close()
+			log.SetOutput(f)
+		} else {
+			log.SetFlags(0)
+			log.SetOutput(ioutil.Discard)
 		}
-		defer f.Close()
-		log.SetOutput(f)
 
 		stdscr, err := gc.Init()
 		if err != nil {

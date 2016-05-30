@@ -104,6 +104,8 @@ func (r *Repo) SaveCommitIfModified(commit *gogit.Commit) (string, error) {
 
 	if !isEqual(commit, original) {
 		return r.SaveCommit(commit)
+	} else {
+		log.Println("Before and after are equal, not saving.")
 	}
 
 	return "", nil
