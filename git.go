@@ -44,11 +44,20 @@ func getCommitChainLength(ci *gogit.Commit, n int) int {
 	return n
 }
 
+func runGitGc() {
+	exec.Command("git", "gc")
+	return
+}
+
 func OpenCurrentRepository() (*Repo, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
+
+	// Run git gc before running glt as speedata/gogit does not implement reading
+	// from Deltas
+	runGitGc()
 
 	repository, err := gogit.OpenRepository(filepath.Join(wd, "/.git"))
 	if err != nil {
