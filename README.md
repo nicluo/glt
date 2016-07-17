@@ -1,5 +1,7 @@
 # GLT - Git Local Transform
 
+![Demo](glt.gif)
+
 ## Installation
 
 Go 1.6, git and ncurses required.
