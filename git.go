@@ -127,14 +127,14 @@ func (r *Repo) SaveCommit(commit *gogit.Commit) (string, error) {
 	}
 
 	gitCmd := fmt.Sprintf(`git filter-branch --env-filter 'if [ $GIT_COMMIT = %s ]
-	  then
-	  	export GIT_AUTHOR_NAME="%s" &&
-	  	export GIT_AUTHOR_EMAIL="%s" &&
-	  	export GIT_AUTHOR_DATE="%s" &&
-	  	export GIT_COMMITTER_NAME="%s" &&
-	  	export GIT_COMMITTER_EMAIL="%s" &&
-	  	export GIT_COMMITTER_DATE="%s"; fi' %s &&
-	  rm -fr "$(git rev-parse --git-dir)/refs/original/"`,
+		then
+			export GIT_AUTHOR_NAME="%s" &&
+			export GIT_AUTHOR_EMAIL="%s" &&
+			export GIT_AUTHOR_DATE="%s" &&
+			export GIT_COMMITTER_NAME="%s" &&
+			export GIT_COMMITTER_EMAIL="%s" &&
+			export GIT_COMMITTER_DATE="%s"; fi' %s &&
+		rm -fr "$(git rev-parse --git-dir)/refs/original/"`,
 		commit.Oid.String(),
 		commit.Author.Name,
 		commit.Author.Email,

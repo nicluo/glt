@@ -39,7 +39,7 @@ func main() {
 	}
 	stdscr.MovePrint(1, 0, "Bold terminal colors:   ")
 	stdscr.AttrOn(gc.A_BLINK)
-	for i, _ := range colours {
+	for i := range colours {
 		stdscr.ColorOn(int16(i))
 		stdscr.AddChar(' ')
 		stdscr.ColorOff(int16(i))
