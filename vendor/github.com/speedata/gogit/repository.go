@@ -26,10 +26,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/speedata/mmap-go"
 )
@@ -73,9 +75,7 @@ type Object struct {
 
 // idx-file
 type idxFile struct {
-	indexpath   string
-	packpath    string
-	packversion uint32
+	packpath string
 
 	fanoutTable [256]int64
 
@@ -87,13 +87,13 @@ type idxFile struct {
 
 func readIdxFile(path string) (*idxFile, error) {
 	ifile := &idxFile{}
-	ifile.indexpath = path
 	ifile.packpath = path[0:len(path)-3] + "pack"
 
 	idxf, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
+	defer idxf.Close()
 	idxMmap, err := mmap.Map(idxf, mmap.RDONLY, 0)
 
 	if err != nil {
@@ -126,14 +126,13 @@ func readIdxFile(path string) (*idxFile, error) {
 	defer fi.Close()
 
 	packVersion := make([]byte, 8)
-	_, err = fi.Read(packVersion)
+	_, err = io.ReadFull(fi, packVersion)
 	if err != nil {
 		return nil, err
 	}
 	if !bytes.HasPrefix(packVersion, []byte{'P', 'A', 'C', 'K'}) {
 		return nil, errors.New("Pack file does not start with 'PACK'")
 	}
-	ifile.packversion = binary.BigEndian.Uint32(packVersion[4:8])
 	return ifile, nil
 }
 
@@ -182,6 +181,9 @@ func filepathFromSHA1(rootdir, sha1 string) string {
 	return filepath.Join(rootdir, "objects", sha1[:2], sha1[2:])
 }
 
+// zlibReaderPool holds zlib Readers.
+var zlibReaderPool sync.Pool
+
 // Read deflated object from the file.
 func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) ([]byte, error) {
 	_, err := file.Seek(start, os.SEEK_SET)
@@ -189,21 +191,23 @@ func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) 
 		return nil, err
 	}
 
-	rc, err := zlib.NewReader(file)
+	z := zlibReaderPool.Get()
+	if z != nil {
+		err = z.(zlib.Resetter).Reset(file, nil)
+	} else {
+		z, err = zlib.NewReader(file)
+	}
+	if z != nil {
+		defer zlibReaderPool.Put(z)
+	}
 	if err != nil {
 		return nil, err
 	}
+	rc := z.(io.ReadCloser)
 	defer rc.Close()
 	zbuf := make([]byte, inflatedSize)
-	// rc.Read can return less than len(zbuf), so we keep reading.
-	// I believe it reads at most 0x8000 bytes
-	var n, count int
-	for count < int(inflatedSize) {
-		n, err = rc.Read(zbuf[count:])
-		if err != nil {
-			return nil, err
-		}
-		count += n
+	if _, err := io.ReadFull(rc, zbuf); err != nil {
+		return nil, err
 	}
 	return zbuf, nil
 }
@@ -307,10 +311,10 @@ func readLenInPackFile(buf []byte) (length int, advance int) {
 func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, length int64, data []byte, err error) {
 	offsetInt := int64(offset)
 	file, err := os.Open(path)
-	defer file.Close()
 	if err != nil {
 		return
 	}
+	defer file.Close()
 	pos, err := file.Seek(offsetInt, os.SEEK_SET)
 	if err != nil {
 		return
@@ -322,7 +326,12 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 	buf := make([]byte, 1024)
 	n, err := file.Read(buf)
 	if err != nil {
-		return
+		if err == io.EOF && n > 0 {
+			// Ignore EOF error and move on
+			err = nil
+		} else {
+			return
+		}
 	}
 	if n == 0 {
 		err = errors.New("Nothing read from pack file")
@@ -424,7 +433,12 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 	b := make([]byte, first_buffer_size)
 	n, err := r.Read(b)
 	if err != nil {
-		return
+		if err == io.EOF && n > 0 {
+			// Ignore EOF error on read
+			err = nil
+		} else {
+			return
+		}
 	}
 	spaceposition := int64(bytes.IndexByte(b, ' '))
 
@@ -465,7 +479,7 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 		var count int64
 		for count < remainingSize {
 			n, err = r.Read(remainingBuf[count:])
-			if err != nil {
+			if err != nil && err != io.EOF {
 				return
 			}
 			count += int64(n)
@@ -473,6 +487,11 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 		b = append(b, remainingBuf...)
 	}
 	data = b[objstart : objstart+length]
+	if err == io.EOF {
+		// The last read yielded exactly the right number of bytes
+		// as well as an EOF. Ignore the EOF; we succeeded.
+		err = nil
+	}
 	return
 }
 
@@ -487,7 +506,7 @@ func (repos *Repository) getRawObject(oid *Oid) (ObjectType, int64, []byte, erro
 				return readObjectBytes(indexfile.packpath, offset, false)
 			}
 		}
-		return 0, 0, nil, errors.New("Object not found")
+		return 0, 0, nil, errObjNotFound
 	}
 	return readObjectFile(objpath, false)
 }

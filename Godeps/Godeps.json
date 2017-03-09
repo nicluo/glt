@@ -1,14 +1,12 @@
 {
-	"ImportPath": "bitbucket.org/nicluo/gtt",
-	"GoVersion": "go1.6",
-	"Packages": [
-		"./..."
-	],
+	"ImportPath": "github.com/nicluo/glt",
+	"GoVersion": "go1.8",
+	"GodepVersion": "v79",
 	"Deps": [
 		{
 			"ImportPath": "github.com/codegangsta/cli",
-			"Comment": "1.2.0-193-gf9cc300",
-			"Rev": "f9cc3001e04f9783cb4ad08ca6791aa07134787c"
+			"Comment": "v1.19.1-24-g9e5b048",
+			"Rev": "9e5b04886c4bfee2ceba1465b8121057355c4e53"
 		},
 		{
 			"ImportPath": "github.com/rthornton128/goncurses",
@@ -17,7 +15,7 @@
 		},
 		{
 			"ImportPath": "github.com/speedata/gogit",
-			"Rev": "1396c978ff9beb13261ff75b4a46db6abded251e"
+			"Rev": "66815cd3f6b58ee192b0c6388295979b872d268f"
 		},
 		{
 			"ImportPath": "github.com/speedata/mmap-go",

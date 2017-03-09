@@ -21,11 +21,13 @@
 package gogit
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 )
 
 type Reference struct {
@@ -35,31 +37,55 @@ type Reference struct {
 	repository *Repository
 }
 
-func (ref *Reference) resolveInfo() (*Reference, error) {
-	destRef := new(Reference)
-	destRef.Name = ref.dest
-
-	destpath := filepath.Join(ref.repository.Path, "info", "refs")
-	infoContents, err := ioutil.ReadFile(destpath)
+func resolveFrom(path, name string) (*Reference, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-
-	r := regexp.MustCompile("([[:xdigit:]]+)\t(.*)\n")
-	refs := r.FindAllStringSubmatch(string(infoContents), -1)
-	for _, v := range refs {
-		if v[2] == ref.dest {
-			oid, err := NewOidFromString(v[1])
-			if err != nil {
-				return nil, err
-			}
-			destRef.Oid = oid
-			return destRef, nil
-		}
+	defer f.Close()
+	sha1, err := findRef(f, name)
+	if err != nil {
+		return nil, err
 	}
-
-	return nil, errors.New("Could not resolve info/refs")
+	oid, err := NewOidFromByteString(sha1)
+	if err != nil {
+		return nil, err
+	}
+	return &Reference{Name: name, Oid: oid}, nil
 }
+
+var (
+	errRefNotFound = errors.New("ref not found")
+	errObjNotFound = errors.New("object not found")
+)
+
+// findRef parses a list of SHA1/ref pairs such as those
+// found in info/refs, packed-refs, or the output of git ls-remote.
+// It looks for ref and returns the corresponding hex-encoded SHA1.
+func findRef(r io.Reader, ref string) ([]byte, error) {
+	refb := []byte(ref)
+	scan := bufio.NewScanner(r)
+	for scan.Scan() {
+		line := bytes.TrimSpace(scan.Bytes())
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		// It appears that info/refs uses tabs to separate sha1s,
+		// whereas packed-refs uses spaces. Be agnostic.
+		ff := bytes.Fields(line)
+		if len(ff) != 2 || len(ff[0]) != 40 || !bytes.Equal(refb, ff[1]) {
+			continue
+		}
+		// Found a well-formed match.
+		return ff[0], nil
+	}
+	if err := scan.Err(); err != nil {
+		return nil, err
+	}
+	return nil, errRefNotFound
+}
+
+var refColon = []byte("ref: ")
 
 // A typical Git repository consists of objects (path objects/ in the root directory)
 // and of references to HEAD, branches, tags and such.
@@ -74,17 +100,27 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 	f, err := ioutil.ReadFile(filepath.Join(repos.Path, name))
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Try looking it up in info/refs.
-			ref.dest = name
-			return ref.resolveInfo()
+			// Try looking it up in info/refs and packed-refs.
+			paths := [...]string{
+				filepath.Join(ref.repository.Path, "info", "refs"),
+				filepath.Join(ref.repository.Path, "packed-refs"),
+			}
+			var destref *Reference
+			var err error
+			for _, path := range paths {
+				destref, err = resolveFrom(path, name)
+				if err == nil {
+					break
+				}
+			}
+			return destref, err
 		}
 		return nil, err
 	}
-	rexp := regexp.MustCompile("ref: (.*)\n")
-	allMatches := rexp.FindAllStringSubmatch(string(f), 1)
-	if allMatches == nil {
-		// let's assume this is a SHA1
-		oid, err := NewOidFromString(string(f[:40]))
+	b := bytes.TrimSpace(f)
+	if !bytes.HasPrefix(b, refColon) {
+		// Try to interpret as a SHA1.
+		oid, err := NewOidFromByteString(b)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +128,7 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 		return ref, nil
 	}
 	// yes, it's "ref: something". Now let's lookup "something"
-	ref.dest = allMatches[0][1]
+	ref.dest = string(b[len(refColon):])
 	return repos.LookupReference(ref.dest)
 }
 
