@@ -1,0 +1,10 @@
+package: github.com/nicluo/glt
+import:
+- package: github.com/rthornton128/goncurses
+  version: ef16d4e36502edc58c45a2c896e00ef8d513dc78
+- package: github.com/speedata/gogit
+  version: 66815cd3f6b58ee192b0c6388295979b872d268f
+- package: github.com/speedata/mmap-go
+  version: 6c75090c55983bef2e129e173681b20d24871ef8
+- package: github.com/urfave/cli
+  version: 9e5b04886c4bfee2ceba1465b8121057355c4e53
