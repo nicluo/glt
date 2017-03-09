@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/codegangsta/cli"
 	gc "github.com/rthornton128/goncurses"
+	"github.com/urfave/cli"
 
 	"io/ioutil"
 	"log"
